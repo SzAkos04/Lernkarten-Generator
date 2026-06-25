@@ -589,7 +589,7 @@ fn generate(
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let raw_json: Value = if args.len() > 1 {
+    let raw_json: Value = if args.len() > 1 && args[1] != "-" {
         let file = File::open(&args[1]).expect("Failed to open input JSON file.");
         serde_json::from_reader(file).expect("Invalid JSON template.")
     } else {
@@ -629,5 +629,120 @@ fn main() {
 
     if let Err(e) = generate(thema, &verbs, &nouns, &adjs) {
         eprintln!("Execution failed with error: {}", e);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+
+    const MOCK_LLM_INPUT: &str = r#"[["v","inf=abschreiben","hu=lemásolni; puskázni","niv=B1","sep=trennbar","typ=stark","pr=schrieb ab","pp=abgeschrieben","siehe=schreiben,täuschen"],["n","Abfall","A2","der","-̈e","hulladék, szemét","-","Müll,Recycling"],["a","abhängig","B2","függő, függőséges","abhängiger","abhängigsten","-","selbstständig,unabhängig"]]"#;
+
+    #[test]
+    fn test_input_parsable_by_serde() {
+        let res: Result<Value, _> = serde_json::from_str(MOCK_LLM_INPUT);
+        assert!(
+            res.is_ok(),
+            "Hiba: A mintaként szolgáló JSON karakterlánc szintaktikailag hibás!"
+        );
+    }
+
+    #[test]
+    fn test_strict_positional_array_lengths() {
+        let raw_json: Value = serde_json::from_str(MOCK_LLM_INPUT).unwrap();
+        let word_list = raw_json
+            .as_array()
+            .expect("A JSON gyökerének tömbnek kell lennie.");
+
+        for item in word_list {
+            let entry = item
+                .as_array()
+                .expect("Minden szónak belső tömbnek kell lennie.");
+            assert!(
+                !entry.is_empty(),
+                "Egyik szóbejegyzés tömbje sem lehet üres."
+            );
+
+            let type_tag = entry[0]
+                .as_str()
+                .expect("A típusjelzőnek stringnek kell lennie (v, n, a).");
+            match type_tag {
+                "n" | "a" => {
+                    assert_eq!(
+                        entry.len(),
+                        8,
+                        "Szigorú struktúra hiba: A Főneveknek ('n') és Mellékneveknek ('a') fixen PONTOSAN 8 elemet kell tartalmazniuk!"
+                    );
+                }
+                "v" => {
+                    assert!(
+                        entry.len() >= 3,
+                        "Hiba: Az igéknek legalább a típust, inf-et és hu jelentést tartalmazniuk kell!"
+                    );
+                    for val in entry.iter().skip(1) {
+                        let s = val.as_str().unwrap();
+                        assert!(
+                            s.contains('='),
+                            "Formázási hiba: Az ige paraméternek 'kulcs=érték' struktúrájúnak kell lennie! Kérdéses elem: '{}'",
+                            s
+                        );
+                    }
+                }
+                _ => panic!("Ismeretlen szótípus-tag: '{}'", type_tag),
+            }
+        }
+    }
+
+    #[test]
+    fn test_noun_umlaut_special_character_convention() {
+        let raw_json: Value = serde_json::from_str(MOCK_LLM_INPUT).unwrap();
+        let word_list = raw_json.as_array().unwrap();
+
+        for item in word_list {
+            let entry = item.as_array().unwrap();
+            if entry[0].as_str().unwrap() == "n" {
+                let word = entry[1].as_str().unwrap();
+                let plural = entry[4].as_str().unwrap();
+
+                if word == "Abfall" || word == "Abflug" || word == "Abschluss" {
+                    assert_eq!(
+                        plural, "-̈e",
+                        "Konvenciós hiba: A(z) '{}' főnév többes számának kötelezően a speciális '-̈e' stringnek kell lennie!",
+                        word
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_obsidian_markdown_generation_logic() {
+        let raw_json: Value = serde_json::from_str(MOCK_LLM_INPUT).unwrap();
+        let word_list = raw_json.as_array().unwrap();
+
+        for item in word_list {
+            let entry = item.as_array().unwrap();
+            match entry[0].as_str().unwrap() {
+                "v" => {
+                    let markdown_output = make_verb(entry);
+                    assert!(markdown_output.contains("Wortart: Verb"));
+                    assert!(markdown_output.contains("#Lernkarten"));
+                }
+                "n" => {
+                    let markdown_output = make_noun(entry);
+                    assert!(markdown_output.contains("Wortart: Substantiv"));
+                    assert!(markdown_output.contains("| Artikel | Substantiv | Plural |"));
+                }
+                "a" => {
+                    let markdown_output = make_adj(entry);
+                    assert!(markdown_output.contains("Wortart: Adjektiv"));
+                    assert!(markdown_output.contains(
+                        "| Positiv          | Komparativ             | Superlativ                |"
+                    ));
+                }
+                _ => {}
+            }
+        }
     }
 }
