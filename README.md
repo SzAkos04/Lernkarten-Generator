@@ -18,7 +18,7 @@ Szigorú JSON generátor vagy. Minimalizáld a tokeneket. Minifikált JSON-t adj
 Formátum: `["v", "inf=...", "hu=...", <opcionális_kulcsok>]`
 - **Fájlnév-szabály**: Kisbetűs, szóközökkel (aláhúzás nélkül). Visszahatóknál a *sich* is a név része (pl. *sich verloben*).
 - **Jelentés (`hu`)**: Kötelezően magyar főnévi igenév (pl. `"tanulni"`, NEM `"tanul"`).
-- **Implicit ragozás**: Csak akkor adj meg `pr`, `pp`, `du`, `er`, `sep`, `typ`, `aux` kulcsokat, ha az ige **rendhagyó (stark/gemischt)**, **tőhangváltós (umlaut)** vagy **modal**. A gyenge/szabályos igéknél (pl. *machen*) ezeket teljesen hagyd el — a fordítóprogram kiszámítja!
+- **Implicit ragozás**: Csak akkor adj meg `pr`, `pp`, `du`, `er`, `sep`, `typ`, `aux` kulcsokat, ha az ige **rendhagyó (stark/gemischt)**, **tőhangváltós (umlaut)** vagy **modal**. Ha egy igének bármelyik személyes alakja rendhagyó (pl. *ihr*, *ich*, *wir*), add meg expliciten (pl. `ihr=...`), a feldolgozó motor felülbírálja vele a számított alakot. A teljesen szabályos igéknél ezeket teljesen hagyd el - a fordítóprogram kiszámítja!
 - **Infobox**: Csak ha van fix elöljárós vonzat vagy fontos nyelvtani megjegyzés.
 - **Siehe**: Kötelezően legalább 2 releváns szó vesszővel elválasztva.
 
@@ -55,4 +55,4 @@ Formátum: Szigorúan pozícióalapú tömb (Pontosan 8 elem):
 ---
 
 ## 5. Alkalmazandó Prompt
-> "Generálj egy minifikált JSON tömböt a(z) [TÉMAKÖR] témában, a Style Guide szabályai alapján. Mennyiség: [X] ige, [Y] főnév, [Z] melléknév. Meglévő szavak, amiket hagyj ki: [LISTA]. Ne használj markdown kódblokkokat, se bevezető/lezáró szöveget. Csak a nyers JSON stringet add vissza."
+> "Generálj egy minifikált JSON tömböt a(z) [TÉMAKÖR] témában, a Style Guide szabályai alapján. Mennyiség: [X] ige, [Y] főnév, [Z] melléknév. Meglévő szavak, amiket hagyj ki: [LISTA]. Rendhagyó alakok esetén minden nem-szekvenciális ragozást (legyen az du, er, vagy ihr) explicit kulcsként adj meg a Verb elemen belül. Ne használj markdown kódblokkokat, se bevezető/lezáró szöveget. Csak a nyers JSON stringet add vissza."
